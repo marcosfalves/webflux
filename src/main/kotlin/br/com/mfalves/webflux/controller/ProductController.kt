@@ -13,6 +13,7 @@ import reactor.util.function.Tuple2
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.*
+import javax.validation.Valid
 
 @RestController
 @RequestMapping("/products")
@@ -33,20 +34,22 @@ class ProductController(val productService: ProductService) {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun createProduct(@RequestBody productInput:ProductInput): Mono<Product> {
+    fun createProduct(@Valid @RequestBody productInput:ProductInput): Mono<Product> {
         val product = Product(UUID.randomUUID().toString(), productInput.name)
         return productService.save(product)
     }
 
     @PutMapping("/{productId}")
     fun updateProduct(@PathVariable productId:String,
-                      @RequestBody productInput: ProductInput): Mono<Product>{
+                      @Valid @RequestBody productInput: Mono<ProductInput>): Mono<Product>{
 
         return productService.findById(productId)
             .switchIfEmpty(
                 Mono.error(ResponseStatusException(HttpStatus.NOT_FOUND, "Product not Found"))
             )
-            .flatMap { productService.save(Product(it.id, productInput.name)) }
+            .then(
+                productInput.flatMap{product -> productService.save(Product(productId, product.name))}
+            )
     }
 
     @DeleteMapping("/{productId}")
